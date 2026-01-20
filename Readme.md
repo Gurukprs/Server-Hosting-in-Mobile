@@ -12,16 +12,6 @@
 > If Phase 1 is solid, everything above it becomes stable.
 > If Phase 1 is weak, the whole system becomes fragile.
 
-![Image](https://termux.dev/assets/globals/home/htop_framed.png)
-
-![Image](https://miro.medium.com/v2/resize%3Afit%3A1400/1%2AZvopVb6D_KjCPG2Vd_5Ufg.jpeg)
-
-![Image](https://www.lifewire.com/thmb/TpZGSaiqMQNrboMQluqWL7CJ16A%3D/1500x0/filters%3Ano_upscale%28%29%3Amax_bytes%28150000%29%3Astrip_icc%28%29/001_how-to-set-an-sd-card-as-default-storage-in-android-6743109-fd386fbed74f439fb397542dfe467063.jpg)
-
-![Image](https://static0.anpoimages.com/wordpress/wp-content/uploads/2021/11/sdcardhero-1.png)
-
----
-
 ## 1️⃣ Install & HARDEN Termux (Non-negotiable)
 
 ### ✅ Use **F-Droid Termux only**
