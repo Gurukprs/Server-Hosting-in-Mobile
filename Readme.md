@@ -406,12 +406,15 @@ Paste:
 ```bash
 #!/data/data/com.termux/files/usr/bin/bash
 
+NODE=/data/data/com.termux/files/usr/bin/node
+
 while true; do
   echo "[NODE] starting $(date)"
-  node ~/apps/backends/node/server.js >> ~/infra/logs/node.log 2>&1
+  $NODE /data/data/com.termux/files/home/apps/backends/node/server.js >> /data/data/com.termux/files/home/infra/logs/node.log 2>&1
   echo "[NODE] crashed, restarting in 2s"
   sleep 2
 done
+
 ```
 
 ```bash
@@ -431,12 +434,15 @@ Paste:
 ```bash
 #!/data/data/com.termux/files/usr/bin/bash
 
+PY=/data/data/com.termux/files/usr/bin/python
+
 while true; do
   echo "[PYTHON] starting $(date)"
-  python ~/apps/backends/python/app.py >> ~/infra/logs/python.log 2>&1
+  $PY /data/data/com.termux/files/home/apps/backends/python/app.py >> /data/data/com.termux/files/home/infra/logs/python.log 2>&1
   echo "[PYTHON] crashed, restarting in 2s"
   sleep 2
 done
+
 ```
 
 ```bash
