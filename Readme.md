@@ -266,3 +266,244 @@ Before proceeding, confirm:
 * [ ] Python + Node installed
 * [ ] Termux:Boot installed
 * [ ] Auto-start script in place
+
+# 🚀 PHASE 2 — BACKEND SERVICES (HARDENED & AUTO-RECOVERING)
+
+## 1️⃣ Backend directory structure (clean separation)
+
+```bash
+mkdir -p ~/apps/backends/{node,python}
+```
+
+Result:
+
+```
+~/apps/backends/
+ ├─ node/
+ └─ python/
+```
+
+---
+
+## 2️⃣ NODE BACKEND (Express-style)
+
+### 2.1 Minimal Express service
+
+```bash
+cd ~/apps/backends/node
+npm init -y
+npm install express
+```
+
+Create `server.js`:
+
+```bash
+nano server.js
+```
+
+Paste:
+
+```js
+const express = require("express");
+const app = express();
+
+const PORT = 5000;
+
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", service: "node-backend" });
+});
+
+app.get("/api/hello", (req, res) => {
+  res.json({ message: "Hello from Node backend" });
+});
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Node backend running on ${PORT}`);
+});
+```
+
+Test manually:
+
+```bash
+node server.js
+```
+
+Visit:
+
+```
+http://localhost:5000/health
+```
+
+✔ If this works → stop it (`Ctrl+C`)
+
+---
+
+## 3️⃣ PYTHON BACKEND (Flask – lightweight)
+
+### 3.1 Install Flask
+
+```bash
+pip install flask
+```
+
+Create `app.py`:
+
+```bash
+cd ~/apps/backends/python
+nano app.py
+```
+
+Paste:
+
+```python
+from flask import Flask, jsonify
+
+app = Flask(__name__)
+
+@app.route("/health")
+def health():
+    return jsonify(status="ok", service="python-backend")
+
+@app.route("/api/hello")
+def hello():
+    return jsonify(message="Hello from Python backend")
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5001)
+```
+
+Test:
+
+```bash
+python app.py
+```
+
+Visit:
+
+```
+http://localhost:5001/health
+```
+
+✔ Works → stop it
+
+---
+
+## 4️⃣ AUTO-RESTART WATCHDOG (THIS IS THE CORE)
+
+We **do not** use PM2.
+We use **infinite-loop watchdog scripts** — proven reliable on Android.
+
+---
+
+### 4.1 Node watchdog
+
+```bash
+nano ~/infra/bin/node-backend.sh
+```
+
+Paste:
+
+```bash
+#!/data/data/com.termux/files/usr/bin/bash
+
+while true; do
+  echo "[NODE] starting $(date)"
+  node ~/apps/backends/node/server.js >> ~/infra/logs/node.log 2>&1
+  echo "[NODE] crashed, restarting in 2s"
+  sleep 2
+done
+```
+
+```bash
+chmod +x ~/infra/bin/node-backend.sh
+```
+
+---
+
+### 4.2 Python watchdog
+
+```bash
+nano ~/infra/bin/python-backend.sh
+```
+
+Paste:
+
+```bash
+#!/data/data/com.termux/files/usr/bin/bash
+
+while true; do
+  echo "[PYTHON] starting $(date)"
+  python ~/apps/backends/python/app.py >> ~/infra/logs/python.log 2>&1
+  echo "[PYTHON] crashed, restarting in 2s"
+  sleep 2
+done
+```
+
+```bash
+chmod +x ~/infra/bin/python-backend.sh
+```
+
+---
+
+## 5️⃣ Register backends in master startup script
+
+Edit:
+
+```bash
+nano ~/infra/bin/start-all.sh
+```
+
+Update it to:
+
+```bash
+#!/data/data/com.termux/files/usr/bin/bash
+
+echo "[BOOT] $(date)"
+
+nohup bash ~/infra/bin/node-backend.sh &
+nohup bash ~/infra/bin/python-backend.sh &
+
+echo "[BOOT COMPLETE]"
+```
+
+---
+
+## 6️⃣ TEST AUTO-RECOVERY (MANDATORY)
+
+### 6.1 Start everything manually
+
+```bash
+bash ~/infra/bin/start-all.sh
+```
+
+Check:
+
+```
+http://localhost:5000/health
+http://localhost:5001/health
+```
+
+---
+
+### 6.2 Kill a backend (test resilience)
+
+```bash
+pkill node
+```
+
+Wait 2 seconds → refresh `/health`
+
+✔ It should come back automatically
+If it does → **your backend layer is SOLID**
+
+---
+
+## ✅ PHASE 2 COMPLETION CHECKLIST
+
+Confirm:
+
+* [ ] Node backend responds on port 5000
+* [ ] Python backend responds on port 5001
+* [ ] Killing process auto-restarts it
+* [ ] Logs are being written
+* [ ] start-all.sh launches both
