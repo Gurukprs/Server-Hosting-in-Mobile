@@ -513,3 +513,188 @@ Confirm:
 * [ ] Killing process auto-restarts it
 * [ ] Logs are being written
 * [ ] start-all.sh launches both
+
+# 🧱 PHASE 3 — STATIC FRONTEND HOSTING (NON-FRAGILE)
+
+## 1️⃣ SD CARD FRONTEND LAYOUT (CRITICAL)
+
+Assume your SD card path is:
+
+```
+/storage/XXXX-XXXX/
+```
+
+Create this once:
+
+```bash
+mkdir -p /storage/XXXX-XXXX/www
+```
+
+This will hold **all phone-hosted frontends**.
+
+### Example layout (scales well)
+
+```
+/storage/XXXX-XXXX/www/
+ ├─ site1/
+ │   ├─ index.html
+ │   └─ static/
+ ├─ site2/
+ │   ├─ index.html
+ │   └─ static/
+ └─ site3/
+```
+
+Each folder = one React app (`npm run build` output).
+
+---
+
+## 2️⃣ BUILD FRONTENDS (ON YOUR PC ONLY)
+
+On your PC (never on phone):
+
+```bash
+npm run build
+```
+
+Then copy **contents of `build/`**, not the folder itself:
+
+```
+build/*
+   ↓
+/storage/XXXX-XXXX/www/site1/
+```
+
+Repeat for each site.
+
+⚠️ Important:
+
+* Use **HashRouter** in React if needed
+* No server-side routing
+* No `.env` secrets in frontend
+
+---
+
+## 3️⃣ STATIC SERVER (SINGLE INSTANCE)
+
+We’ll serve **everything** from `/www`.
+
+### 3.1 Create frontend server script
+
+```bash
+nano ~/infra/bin/frontend-server.sh
+```
+
+Paste:
+
+```bash
+#!/data/data/com.termux/files/usr/bin/bash
+
+FRONTEND_ROOT="/storage/sdcard1/www"
+LOG="$HOME/infra/logs/frontend.log"
+
+echo "[FRONTEND] boot $(date)" >> "$LOG"
+
+if [ ! -d "$FRONTEND_ROOT" ]; then
+  echo "[FRONTEND] ERROR: $FRONTEND_ROOT not found" >> "$LOG"
+  exit 1
+fi
+
+cd "$FRONTEND_ROOT" || exit 1
+
+while true; do
+  echo "[FRONTEND] starting http.server $(date)" >> "$LOG"
+  python -m http.server 8000 >> "$LOG" 2>&1
+  echo "[FRONTEND] crashed, restarting in 2s $(date)" >> "$LOG"
+  sleep 2
+done
+
+```
+
+Make executable:
+
+```bash
+chmod +x ~/infra/bin/frontend-server.sh
+```
+
+---
+
+## 4️⃣ URL STRUCTURE (IMPORTANT)
+
+With this setup:
+
+```
+http://PHONE_IP:8000/site1/
+http://PHONE_IP:8000/site2/
+```
+
+After Cloudflare Tunnel (next phase):
+
+```
+https://your-domain/site1/
+https://your-domain/site2/
+```
+
+✔ Scales to unlimited sites
+✔ No extra ports
+✔ No extra servers
+
+---
+
+## 5️⃣ REGISTER FRONTEND SERVER IN BOOT SEQUENCE
+
+Edit master startup:
+
+```bash
+nano ~/infra/bin/start-all.sh
+```
+
+Final version now:
+
+```bash
+#!/data/data/com.termux/files/usr/bin/bash
+
+echo "[BOOT] $(date)"
+
+nohup bash ~/infra/bin/node-backend.sh &
+nohup bash ~/infra/bin/python-backend.sh &
+nohup bash ~/infra/bin/frontend-server.sh &
+
+echo "[BOOT COMPLETE]"
+```
+
+---
+
+## 6️⃣ TEST LOCALLY (MANDATORY)
+
+Run:
+
+```bash
+bash ~/infra/bin/start-all.sh
+```
+
+Check from phone browser or PC (same Wi-Fi):
+
+* `http://PHONE_IP:8000/site1/`
+* `http://PHONE_IP:8000/site2/`
+* Backend still works:
+
+  * `:5000/health`
+  * `:5001/health`
+
+✔ All must work together
+
+---
+
+## ✅ PHASE 3 COMPLETION CHECKLIST
+
+Confirm:
+
+* [ ] React builds copied to SD card
+* [ ] Frontends accessible at `/siteX/`
+* [ ] Frontend server auto-restarts
+* [ ] start-all.sh launches everything
+* [ ] Screen can be OFF
+
+---
+
