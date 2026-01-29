@@ -698,3 +698,288 @@ Confirm:
 
 ---
 
+Great — thanks for pasting the full Phase 3 context.
+Since you’ve **actually completed Phase 3 correctly**, we can now move to the **most sensitive but also most powerful step**.
+
+---
+
+# 🌍 PHASE 4 — INTERNET EXPOSURE (CLOUDFLARE TUNNEL, HARDENED)
+
+## 🔑 CORE DECISION (LOCKED)
+
+* Tunnel provider: **Cloudflare**
+* Tunnel type: **Named tunnel**
+* Tunnel runs **on the phone**
+* Phone exposes:
+
+  * Frontends (`:8000`)
+  * Backends (`:5000`, `:5001`)
+* Cloudflare handles:
+
+  * HTTPS
+  * DNS
+  * Reconnects
+  * Public routing
+
+---
+
+## 1️⃣ Install `cloudflared` (Termux)
+
+```bash
+pkg install -y cloudflared
+cloudflared --version
+```
+
+✔ If version prints → continue
+❌ If not → stop and fix before proceeding
+
+---
+
+## 2️⃣ Authenticate Cloudflare (ONE TIME ONLY)
+
+Run:
+
+```bash
+cloudflared tunnel login
+```
+
+What happens:
+
+* Browser opens
+* Log in to Cloudflare
+* Select your account
+* Approve access
+
+Cloudflare will store credentials at:
+
+```
+~/.cloudflared/cert.pem
+```
+
+✔ This step is **never repeated**
+
+---
+
+## 3️⃣ Create a NAMED tunnel (IMPORTANT)
+
+Choose a **stable name**, e.g.:
+
+```bash
+cloudflared tunnel create phone-server
+```
+
+Output will show:
+
+* Tunnel UUID
+* Tunnel credentials JSON
+
+Example:
+
+```
+Tunnel ID: a1b2c3d4-xxxx
+```
+
+A file will be created:
+
+```
+~/.cloudflared/a1b2c3d4-xxxx.json
+```
+
+⚠️ Do NOT delete this file
+
+---
+
+## 4️⃣ Cloudflare Tunnel config (CRITICAL FILE)
+
+Create config directory (if not exists):
+
+```bash
+mkdir -p ~/.cloudflared
+nano ~/.cloudflared/config.yml
+```
+
+### ✅ Paste THIS (adjust domains later)
+
+```yaml
+tunnel: phone-server
+credentials-file: /data/data/com.termux/files/home/.cloudflared/phone-server.json
+
+ingress:
+  # Frontend sites (static)
+  - hostname: phone.yourdomain.com
+    service: http://localhost:8000
+
+  # Node backend
+  - hostname: api.yourdomain.com
+    service: http://localhost:5000
+
+  # Python backend
+  - hostname: pyapi.yourdomain.com
+    service: http://localhost:5001
+
+  # Catch-all (required)
+  - service: http_status:404
+```
+
+⚠️ Replace:
+
+* `yourdomain.com` → your real domain
+  (or keep `*.trycloudflare.com` later if you want)
+
+---
+
+## 5️⃣ DNS ROUTING (Cloudflare Dashboard)
+
+For each hostname, run:
+
+```bash
+cloudflared tunnel route dns phone-server phone.yourdomain.com
+cloudflared tunnel route dns phone-server api.yourdomain.com
+cloudflared tunnel route dns phone-server pyapi.yourdomain.com
+```
+
+Cloudflare will:
+
+* Create DNS records automatically
+* Bind them to your tunnel
+* No manual DNS edits needed
+
+✔ This is what makes it **robust**
+
+---
+
+## 6️⃣ Test tunnel manually (MANDATORY)
+
+Before automating, test:
+
+```bash
+cloudflared tunnel run phone-server
+```
+
+Now test from **any internet connection**:
+
+* `https://phone.yourdomain.com/site1/`
+* `https://api.yourdomain.com/health`
+* `https://pyapi.yourdomain.com/health`
+
+✔ If all work → proceed
+❌ If not → STOP and debug (do not continue)
+
+---
+
+## 7️⃣ Auto-start tunnel on boot (24/7 guarantee)
+
+Create tunnel watchdog:
+
+```bash
+nano ~/infra/bin/cloudflare-tunnel.sh
+```
+
+Paste:
+
+```bash
+#!/data/data/com.termux/files/usr/bin/bash
+
+LOG="$HOME/infra/logs/cloudflared.log"
+
+while true; do
+  echo "[CLOUDFLARE] starting $(date)" >> "$LOG"
+  cloudflared tunnel run phone-server >> "$LOG" 2>&1
+  echo "[CLOUDFLARE] crashed, restarting in 5s $(date)" >> "$LOG"
+  sleep 5
+done
+```
+
+Make executable:
+
+```bash
+chmod +x ~/infra/bin/cloudflare-tunnel.sh
+```
+
+---
+
+## 8️⃣ Register tunnel in master boot script
+
+Edit:
+
+```bash
+nano ~/infra/bin/start-all.sh
+```
+
+Final **Phase-4 version**:
+
+```bash
+#!/data/data/com.termux/files/usr/bin/bash
+
+echo "[BOOT] $(date)"
+
+nohup bash ~/infra/bin/node-backend.sh &
+nohup bash ~/infra/bin/python-backend.sh &
+nohup bash ~/infra/bin/frontend-server.sh &
+nohup bash ~/infra/bin/cloudflare-tunnel.sh &
+
+echo "[BOOT COMPLETE]"
+```
+
+---
+
+## 9️⃣ FAILURE TESTS (NON-OPTIONAL)
+
+Do **all** of these:
+
+### 🔹 Test 1 — Reboot phone
+
+* Power OFF → ON
+* Do nothing
+* Wait 2–3 minutes
+* Check URLs from another network
+
+### 🔹 Test 2 — Kill tunnel
+
+```bash
+pkill cloudflared
+```
+
+Wait → URL should recover
+
+### 🔹 Test 3 — Wi-Fi OFF → ON
+
+Tunnel must reconnect automatically
+
+✔ If all pass → system is **strong**
+
+---
+
+## ✅ PHASE 4 COMPLETION CHECKLIST
+
+Confirm:
+
+* [ ] Frontend accessible via HTTPS
+* [ ] Node API accessible via HTTPS
+* [ ] Python API accessible via HTTPS
+* [ ] Tunnel restarts automatically
+* [ ] Works after reboot
+* [ ] Screen stays OFF
+
+---
+
+## 🏁 WHAT YOU HAVE BUILT (REALITY CHECK)
+
+You now have:
+
+* A **self-healing server**
+* Running on a **Android phone**
+* Hosting:
+
+  * Multiple frontends
+  * Multiple backends
+* Publicly reachable
+* HTTPS secured
+* No cloud VM costs
+* No sleep / cold starts
+
+This is **not a toy setup** — it’s a legitimate edge server.
+
+---
+
+Congratulation, You’ve built something genuinely impressive here 👏🎉
